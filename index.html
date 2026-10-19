@@ -1,101 +1,89 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="zh-Hant-TW">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>合格用水場所地圖</title>
-  <meta name="description" content="記錄各大觀光區使用合格淨水設備的店家，提供旅客參考。">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="合格用水場所地圖">
-  <meta property="og:description" content="出門旅遊前，先查查店家的淨水設備有沒有通過查核。">
-  <meta property="og:locale" content="zh_TW">
-  <meta name="theme-color" content="#0f6e8c">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>合格用水場所地圖</title>
+<meta name="description" content="查詢店家是否使用合格淨水設備：尚未查核、查核合格、查核不合格。">
+<meta property="og:title" content="合格用水場所地圖">
+<meta property="og:description" content="查詢店家是否使用合格淨水設備，店家也可自主上傳濾心照片。">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="brand-mark" aria-hidden="true">💧</span>
-      <div>
-        <h1>合格用水場所地圖</h1>
-        <p class="tagline">觀光區店家淨水設備查核紀錄</p>
-      </div>
-    </div>
-    <button id="open-submit" class="btn btn-primary" type="button">店家登錄</button>
-  </header>
+<header>
+  <h1>💧 合格用水場所地圖</h1>
+  <nav><a href="submit.html">店家自主上傳</a><a href="admin.html">管理</a></nav>
+</header>
+<div class="layout">
+  <aside>
+    <div class="filters" id="filters"></div>
+    <input type="search" id="q" placeholder="搜尋店名、地址、縣市">
+    <p class="muted" id="count">載入中…</p>
+    <ul class="list" id="list"></ul>
+  </aside>
+  <div id="map"></div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+const map = L.map("map").setView(APP_CONFIG.MAP_CENTER, APP_CONFIG.MAP_ZOOM);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19, attribution: "&copy; OpenStreetMap contributors",
+}).addTo(map);
 
-  <div id="demo-banner" class="banner" hidden>目前為示範模式：地圖上是示範資料，尚未連接資料庫。</div>
-  <div id="pick-banner" class="banner banner-pick" hidden>請在地圖上點選店家位置 <button id="cancel-pick" class="btn btn-small" type="button">取消</button></div>
+const layers = {}, shown = { pending: true, passed: true, failed: true };
+for (const k in STATUS) layers[k] = L.layerGroup().addTo(map);
+let stores = [], markers = {};
 
-  <main class="layout">
-    <aside class="panel" aria-label="篩選與店家列表">
-      <label class="field">
-        <span>觀光區</span>
-        <select id="area-select"><option value="all">全部地區</option></select>
-      </label>
-      <label class="field">
-        <span>搜尋店名或地址</span>
-        <input id="search" type="search" placeholder="例如：九份">
-      </label>
-      <fieldset class="status-filter">
-        <legend>查核狀態</legend>
-        <div id="status-toggles"></div>
-      </fieldset>
-      <p id="result-count" class="muted"></p>
-      <ul id="store-list" class="store-list"></ul>
-    </aside>
-    <div id="map" role="region" aria-label="地圖"></div>
-  </main>
+document.getElementById("filters").innerHTML = Object.entries(STATUS).map(([k, s]) =>
+  `<label class="chip"><input type="checkbox" data-k="${k}" checked><span class="dot" style="background:${s.color}"></span>${s.label} <b id="n-${k}">0</b></label>`
+).join("");
+document.getElementById("filters").addEventListener("change", (e) => {
+  const k = e.target.dataset.k; shown[k] = e.target.checked;
+  shown[k] ? map.addLayer(layers[k]) : map.removeLayer(layers[k]);
+  renderList();
+});
+document.getElementById("q").addEventListener("input", renderList);
 
-  <footer class="footer">
-    本站為民間自主整理的資訊平台，並非政府機關網站。查核結果依本站公開標準判定，店家如有疑義，請至
-    <a href="https://github.com/oao913oao/water-map/issues" target="_blank" rel="noopener">意見回報</a> 申請更正。
-  </footer>
+function popup(s) {
+  const st = STATUS[s.status];
+  return `<b>${esc(s.name)}</b><br>
+    <span class="tag" style="background:${st.color}">${st.label}</span>
+    ${s.inspected_at ? `<span class="muted"> 查核日 ${esc(s.inspected_at)}</span>` : ""}
+    <div class="muted">${esc(s.address)}</div>
+    ${s.filter_brand ? `<div>淨水設備：${esc(s.filter_brand)}</div>` : ""}
+    ${s.cartridge_changed_at ? `<div>最近更換濾心：${esc(s.cartridge_changed_at)}</div>` : ""}
+    ${s.inspection_note ? `<div>備註：${esc(s.inspection_note)}</div>` : ""}
+    <div class="photos">${(s.photo_paths || []).slice(0, 4).map(p => `<a href="${photoUrl(p)}" target="_blank" rel="noopener"><img src="${photoUrl(p)}" alt="店家照片" loading="lazy"></a>`).join("")}</div>`;
+}
 
-  <dialog id="submit-dialog" class="dialog">
-    <form id="submit-form" class="form" novalidate>
-      <div class="dialog-head">
-        <h2>店家登錄／更新設備資料</h2>
-        <button type="button" class="btn btn-ghost" data-close aria-label="關閉">✕</button>
-      </div>
-      <p class="muted">送出後會先由管理員審核，通過後才會顯示在地圖上。</p>
+function renderList() {
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  const rows = stores.filter(s => shown[s.status] &&
+    (!q || [s.name, s.address, s.city].join(" ").toLowerCase().includes(q)));
+  document.getElementById("count").textContent = `顯示 ${rows.length} / ${stores.length} 間店家`;
+  document.getElementById("list").innerHTML = rows.map(s =>
+    `<li data-id="${s.id}"><span class="dot" style="background:${STATUS[s.status].color}"></span> <b>${esc(s.name)}</b><div class="muted">${esc(s.address)}</div></li>`
+  ).join("");
+}
+document.getElementById("list").addEventListener("click", (e) => {
+  const li = e.target.closest("li"); if (!li) return;
+  const m = markers[li.dataset.id]; map.setView(m.getLatLng(), 17); m.openPopup();
+});
 
-      <label class="field"><span>店名 *</span><input name="store_name" required maxlength="80"></label>
-      <label class="field"><span>觀光區 *</span><input name="area" required maxlength="40" placeholder="例如：九份、淡水、墾丁" list="area-options"></label>
-      <datalist id="area-options"></datalist>
-      <label class="field"><span>地址</span><input name="address" maxlength="160"></label>
-
-      <div class="field">
-        <span>店家位置 *</span>
-        <div class="row">
-          <input name="lat" inputmode="decimal" placeholder="緯度" readonly required>
-          <input name="lng" inputmode="decimal" placeholder="經度" readonly required>
-        </div>
-        <div class="row">
-          <button type="button" id="pick-on-map" class="btn">在地圖上點選</button>
-          <button type="button" id="use-gps" class="btn">使用目前位置</button>
-        </div>
-      </div>
-
-      <label class="field"><span>淨水設備品牌／型號</span><input name="equipment" maxlength="120"></label>
-      <label class="field"><span>最近一次更換濾芯日期</span><input name="cartridge_replaced_on" type="date"></label>
-      <label class="field">
-        <span>照片（濾水器外觀、濾芯狀況，最多 4 張，每張 5 MB 內）</span>
-        <input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple>
-      </label>
-      <label class="field"><span>聯絡 Email（不公開，僅供審核聯繫）</span><input name="contact" type="email" maxlength="120"></label>
-      <label class="check"><input name="consent" type="checkbox" required> 我是店家或經店家同意，並同意照片與資料用於本站審核與公開顯示（聯絡方式除外）。</label>
-
-      <p id="form-msg" class="form-msg" role="status"></p>
-      <div class="row end">
-        <button type="button" class="btn" data-close>取消</button>
-        <button type="submit" class="btn btn-primary" id="submit-btn">送出</button>
-      </div>
-    </form>
-  </dialog>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script type="module" src="app.js"></script>
+(async () => {
+  const { data, error } = await sb.from("stores").select("*").order("name");
+  if (error) { document.getElementById("count").textContent = "載入失敗：" + error.message; return; }
+  stores = data;
+  for (const k in STATUS) document.getElementById("n-" + k).textContent = stores.filter(s => s.status === k).length;
+  for (const s of stores) {
+    markers[s.id] = L.marker([s.lat, s.lng], { icon: pinIcon(s.status), title: s.name })
+      .bindPopup(popup(s)).addTo(layers[s.status]);
+  }
+  renderList();
+})();
+</script>
 </body>
 </html>
