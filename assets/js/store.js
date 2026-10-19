@@ -23,7 +23,7 @@ function explain(s) {
 }
 
 if (!id) {
-  main.innerHTML = `<div class="notice error">網址缺少店家編號。請從<a href="/">地圖</a>點選店家進入。</div>`;
+  main.innerHTML = `<div class="notice error">網址缺少店家編號。請從<a href="./">地圖</a>點選店家進入。</div>`;
 } else {
   try {
     const s = await fetchStore(id);
@@ -31,7 +31,7 @@ if (!id) {
     const st = STATUS[s.status] || STATUS.pending;
     setMeta({ title: `${s.name}（${st.label}）`, description: `${s.name}｜${s.address}｜淨水設備查核結果：${st.label}` });
     main.innerHTML = `
-      <p><a href="/?store=${encodeURIComponent(s.id)}">回到地圖</a></p>
+      <p><a href="./?store=${encodeURIComponent(s.id)}">回到地圖</a></p>
       <div class="store-head">
         <div>
           <h1>${esc(s.name)}</h1>
@@ -59,7 +59,7 @@ if (!id) {
         <button class="btn" id="share" type="button">分享這家店</button>
         <a class="btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}" target="_blank" rel="noopener">導航前往</a>
       </div>
-      <p class="muted" style="margin-top:24px">我是這家店的負責人：<a href="/account.html?claim=${encodeURIComponent(s.id)}">認領並上傳資料</a>。資料有誤：<a href="/about.html#contact">申請更正</a>。</p>`;
+      <p class="muted" style="margin-top:24px">我是這家店的負責人：<a href="account.html?claim=${encodeURIComponent(s.id)}">認領並上傳資料</a>。資料有誤：<a href="about.html#contact">申請更正</a>。</p>`;
 
     const L = window.L;
     const mm = L.map('minimap', { center: [s.lat, s.lng], zoom: 17, scrollWheelZoom: false });
@@ -75,6 +75,6 @@ if (!id) {
     });
   } catch (err) {
     console.error(err);
-    main.innerHTML = `<div class="notice error">找不到這家店（編號 ${esc(id)}）。它可能已被移除，請回到<a href="/">地圖</a>重新搜尋。</div>`;
+    main.innerHTML = `<div class="notice error">找不到這家店（編號 ${esc(id)}）。它可能已被移除，請回到<a href="./">地圖</a>重新搜尋。</div>`;
   }
 }

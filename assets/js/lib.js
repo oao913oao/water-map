@@ -59,7 +59,7 @@ export function todayStr(d = new Date()) {
   return tz.toISOString().slice(0, 10);
 }
 export function storeUrl(id) {
-  return `/store.html?id=${encodeURIComponent(id)}`;
+  return `store.html?id=${encodeURIComponent(id)}`;
 }
 export function storeIdFromUrl() {
   const m = location.pathname.match(/\/store\/(\d+)/);
@@ -98,16 +98,16 @@ export function baseLayers(L) {
 /* ---------- 共用頁首、頁尾 ---------- */
 const LOGO = `<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2C13 2 5 11.5 5 16.5a8 8 0 0 0 16 0C21 11.5 13 2 13 2Z" fill="var(--action)"/><path d="m9.5 16.5 2.6 2.6 4.6-5" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 export function renderChrome(active) {
-  const nav = [['index', '/', '地圖'], ['about', '/about.html', '查核說明'], ['account', '/account.html', '店家專區']];
+  const nav = [['index', './', '地圖'], ['about', 'about.html', '查核說明'], ['account', 'account.html', '店家專區']];
   const header = document.createElement('header');
   header.className = 'topbar';
-  header.innerHTML = `<a class="brand" href="/">${LOGO}<span>${esc(SITE_NAME)}</span></a>
+  header.innerHTML = `<a class="brand" href="./">${LOGO}<span>${esc(SITE_NAME)}</span></a>
     <nav aria-label="主選單">${nav.map(([k, href, t]) => `<a href="${href}"${k === active ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
   document.body.prepend(header);
   if (active !== 'index') {
     const f = document.createElement('footer');
     f.className = 'site';
-    f.innerHTML = `${esc(SITE_NAME)}為民間自主查核平台，非政府機關網站。查核結果反映送件當時的資料，如有錯誤請由<a href="/about.html#contact">更正申請</a>聯繫我們。`;
+    f.innerHTML = `${esc(SITE_NAME)}為民間自主查核平台，非政府機關網站。查核結果反映送件當時的資料，如有錯誤請由<a href="about.html#contact">更正申請</a>聯繫我們。`;
     document.body.append(f);
   }
 }

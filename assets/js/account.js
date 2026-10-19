@@ -44,7 +44,7 @@ if (!CONFIGURED) {
     e.preventDefault();
     const email = $('email').value.trim();
     if (!email) return msg('請先在上方填入註冊時的 Email，再按「忘記密碼」。', 'error');
-    const { error } = await c.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/account.html` });
+    const { error } = await c.auth.resetPasswordForEmail(email, { redirectTo: new URL('account.html', location.href).href });
     msg(error ? `無法寄出重設信：${esc(error.message)}` : '已寄出重設密碼信，請到信箱點擊連結。', error ? 'error' : 'ok');
   });
   $('reset-form').addEventListener('submit', async e => {

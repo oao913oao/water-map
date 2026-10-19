@@ -32,7 +32,7 @@ if (!CONFIGURED) {
   const c = await sb();
   const { data: { session } } = await c.auth.getSession();
   const { data: prof } = session ? await c.from('profiles').select('role').eq('id', session.user.id).maybeSingle() : { data: null };
-  if (!session) msg('請先到<a href="/account.html">店家專區</a>登入查核員帳號。', 'error');
+  if (!session) msg('請先到<a href="account.html">店家專區</a>登入查核員帳號。', 'error');
   else if (!['reviewer', 'admin'].includes(prof?.role)) msg('這個帳號沒有查核權限。如需開通，請聯繫網站管理員。', 'error');
   else start(c);
 }
