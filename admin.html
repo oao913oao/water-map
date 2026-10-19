@@ -84,9 +84,12 @@ $("lf").onsubmit = async (e) => {
 };
 $("logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
 
-async function boot() {
-  const { data: { session } } = await sb.auth.getSession();
+let booted = false;
+async function boot(session) {
+  if (booted) return;
   if (!session) { $("login").hidden = false; return; }
+  booted = true;
+  $("login").hidden = true;
   $("logout").hidden = false;
   const { data: isAdmin } = await sb.rpc("is_admin");
   if (!isAdmin) { $("noadmin").hidden = false; $("uid").textContent = session.user.id; return; }
@@ -94,7 +97,10 @@ async function boot() {
   initMap();
   await Promise.all([loadSubs(), loadStores()]);
 }
-sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" && $("app").hidden && $("noadmin").hidden) location.reload(); });
+// 單一入口：頁面載入（INITIAL_SESSION）或點登入連結回來（SIGNED_IN）時各只啟動一次，不重新整理頁面
+sb.auth.onAuthStateChange((ev, session) => {
+  if (ev === "INITIAL_SESSION" || ev === "SIGNED_IN") setTimeout(() => boot(session), 0);
+});
 
 function initMap() {
   mini = L.map("mini").setView(APP_CONFIG.MAP_CENTER, 7);
@@ -210,7 +216,6 @@ $("stores").onclick = async (e) => {
   if (confirm(`確定刪除「${s.name}」？`)) { await sb.from("stores").delete().eq("id", s.id); loadStores(); }
 };
 
-boot();
 </script>
 </body>
 </html>
