@@ -39,8 +39,30 @@ if (!CONFIGURED) {
   });
   $('logout').addEventListener('click', () => c.auth.signOut());
 
+  /* ---------- 忘記密碼 ---------- */
+  $('forgot').addEventListener('click', async e => {
+    e.preventDefault();
+    const email = $('email').value.trim();
+    if (!email) return msg('請先在上方填入註冊時的 Email，再按「忘記密碼」。', 'error');
+    const { error } = await c.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/account.html` });
+    msg(error ? `無法寄出重設信：${esc(error.message)}` : '已寄出重設密碼信，請到信箱點擊連結。', error ? 'error' : 'ok');
+  });
+  $('reset-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const { error } = await c.auth.updateUser({ password: $('new-password').value });
+    if (error) return msg(`更新失敗：${esc(error.message)}`, 'error');
+    $('reset').classList.add('hidden'); $('dash').classList.remove('hidden');
+    msg('密碼已更新。', 'ok');
+  });
+
   let ready = false;
-  c.auth.onAuthStateChange((_e, session) => {
+  c.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      user = session?.user || null; ready = true;
+      $('auth').classList.add('hidden'); $('dash').classList.add('hidden'); $('reset').classList.remove('hidden');
+      if (user) setTimeout(loadDashboard, 0);
+      return;
+    }
     const u = session?.user || null;
     if (ready && u?.id === user?.id) return;
     ready = true;

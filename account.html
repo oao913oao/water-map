@@ -34,9 +34,20 @@
             <button class="btn" type="submit" id="auth-submit">登入</button>
             <button class="btn secondary" type="button" id="auth-toggle">還沒有帳號？註冊</button>
           </div>
+          <p style="margin-top:14px"><a href="#" id="forgot">忘記密碼</a></p>
         </form>
       </div>
       <p class="muted">註冊即表示你同意我們依<a href="/about.html#privacy">隱私權說明</a>處理你提供的資料。</p>
+    </section>
+
+    <!-- 重設密碼 -->
+    <section id="reset" class="hidden">
+      <form class="panel" id="reset-form">
+        <h2>設定新密碼</h2>
+        <label for="new-password">新密碼 <span class="muted">至少 8 個字元</span></label>
+        <input id="new-password" type="password" required minlength="8" autocomplete="new-password">
+        <div class="row" style="margin-top:18px"><button class="btn" type="submit">儲存新密碼</button></div>
+      </form>
     </section>
 
     <!-- 已登入 -->
