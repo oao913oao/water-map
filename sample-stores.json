@@ -1,0 +1,8 @@
+[
+  { "id": "demo-1", "name": "示範店家 A", "area": "九份", "address": "（示範地址）", "lat": 25.1097, "lng": 121.8445, "status": "passed", "equipment": "示範型號 RO-100", "cartridge_replaced_on": "2026-09-01", "checked_on": "2026-10-01", "note": "示範資料", "demo": true },
+  { "id": "demo-2", "name": "示範店家 B", "area": "九份", "address": "（示範地址）", "lat": 25.1085, "lng": 121.8431, "status": "unchecked", "demo": true },
+  { "id": "demo-3", "name": "示範店家 C", "area": "淡水", "address": "（示範地址）", "lat": 25.1693, "lng": 121.4404, "status": "passed", "equipment": "示範型號 UF-20", "cartridge_replaced_on": "2026-08-15", "checked_on": "2026-09-20", "demo": true },
+  { "id": "demo-4", "name": "示範店家 D", "area": "淡水", "address": "（示範地址）", "lat": 25.1710, "lng": 121.4378, "status": "failed", "equipment": "示範型號 PP-5", "cartridge_replaced_on": "2025-11-02", "checked_on": "2026-09-20", "note": "示範：濾芯逾期未更換", "demo": true },
+  { "id": "demo-5", "name": "示範店家 E", "area": "日月潭", "address": "（示範地址）", "lat": 23.8676, "lng": 120.9142, "status": "unchecked", "demo": true },
+  { "id": "demo-6", "name": "示範店家 F", "area": "墾丁", "address": "（示範地址）", "lat": 21.9450, "lng": 120.7960, "status": "passed", "equipment": "示範型號 RO-200", "cartridge_replaced_on": "2026-07-30", "checked_on": "2026-09-05", "demo": true }
+]
