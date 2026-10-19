@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>店家專區｜合格用水場所地圖</title>
+  <meta name="description" content="店家登入、認領店家、上傳淨水設備與濾芯紀錄。">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@700&family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body>
+  <main class="page" id="main">
+    <h1>店家專區</h1>
+    <div id="msg" role="status" aria-live="polite"></div>
+
+    <!-- 未登入 -->
+    <section id="auth" class="hidden">
+      <div class="panel">
+        <h2 id="auth-title">登入</h2>
+        <form id="auth-form">
+          <div id="name-field" class="hidden">
+            <label for="display-name">店家或聯絡人名稱</label>
+            <input id="display-name" autocomplete="organization">
+          </div>
+          <label for="email">Email</label>
+          <input id="email" type="email" required autocomplete="email">
+          <label for="password">密碼 <span class="muted">至少 8 個字元</span></label>
+          <input id="password" type="password" required minlength="8" autocomplete="current-password">
+          <div class="row" style="margin-top:18px">
+            <button class="btn" type="submit" id="auth-submit">登入</button>
+            <button class="btn secondary" type="button" id="auth-toggle">還沒有帳號？註冊</button>
+          </div>
+        </form>
+      </div>
+      <p class="muted">註冊即表示你同意我們依<a href="/about.html#privacy">隱私權說明</a>處理你提供的資料。</p>
+    </section>
+
+    <!-- 已登入 -->
+    <section id="dash" class="hidden">
+      <div class="row" style="justify-content:space-between">
+        <p class="muted" id="who"></p>
+        <div class="row">
+          <a class="btn secondary hidden" id="admin-link" href="/admin.html">查核後台</a>
+          <button class="btn secondary" id="logout" type="button">登出</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>我的店家</h2>
+        <ul class="list" id="my-stores"></ul>
+      </div>
+
+      <div class="panel hidden" id="upload-panel">
+        <h2>上傳淨水設備資料：<span id="upload-store"></span></h2>
+        <p>請先在紙上寫下今天的驗證碼，拍「驗證碼紙條＋淨水器」的照片。</p>
+        <p><span class="code-box" id="vcode">····</span></p>
+        <form id="upload-form">
+          <label for="purifier">淨水器品牌型號</label>
+          <input id="purifier" required placeholder="例如：○○牌 RO-500">
+          <label for="cartridge">濾芯型號 <span class="muted">選填</span></label>
+          <input id="cartridge" placeholder="例如：PP 棉＋活性碳">
+          <label for="replaced">最近一次更換濾芯日期</label>
+          <input id="replaced" type="date" required>
+          <label for="p1">照片 1：淨水器整體，含驗證碼紙條</label>
+          <input id="p1" type="file" accept="image/*" capture="environment" required>
+          <label for="p2">照片 2：濾芯近照（看得到型號或更換標籤）</label>
+          <input id="p2" type="file" accept="image/*" capture="environment" required>
+          <label for="p3">照片 3：更換收據或保養紀錄 <span class="muted">選填</span></label>
+          <input id="p3" type="file" accept="image/*">
+          <label for="note">補充說明 <span class="muted">選填</span></label>
+          <textarea id="note"></textarea>
+          <div class="row" style="margin-top:18px">
+            <button class="btn" type="submit" id="upload-submit">送出審核</button>
+            <button class="btn secondary" type="button" id="upload-cancel">取消</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>送件紀錄</h2>
+        <ul class="list" id="my-subs"></ul>
+      </div>
+
+      <div class="panel" id="claim-panel">
+        <h2>認領我的店</h2>
+        <p class="muted">認領通過後才能上傳資料。查核員會以統一編號或電話確認你是店家負責人。</p>
+        <form id="claim-form">
+          <label for="claim-search">搜尋地圖上的店名</label>
+          <input id="claim-search" placeholder="輸入店名" autocomplete="off">
+          <select id="claim-store" aria-label="選擇店家" style="margin-top:8px"></select>
+          <label class="row" style="font-weight:400;gap:8px"><input type="checkbox" id="claim-new" style="width:auto;min-height:auto"> 地圖上找不到我的店，申請新增</label>
+          <div id="new-fields" class="hidden">
+            <label for="new-name">店名</label><input id="new-name">
+            <label for="new-address">地址</label><input id="new-address" autocomplete="street-address">
+            <label for="new-area">所在觀光區 <span class="muted">例如淡水老街</span></label><input id="new-area">
+            <label for="new-cat">類型</label>
+            <select id="new-cat"><option>飲料店</option><option>餐廳</option><option>咖啡廳</option><option>冰店</option><option>小吃</option><option>其他</option></select>
+          </div>
+          <label for="tax-id">統一編號 <span class="muted">選填，有填審核較快</span></label>
+          <input id="tax-id" inputmode="numeric" pattern="\d{8}" maxlength="8">
+          <label for="contact-name">聯絡人姓名</label><input id="contact-name" required autocomplete="name">
+          <label for="contact-phone">聯絡電話</label><input id="contact-phone" required type="tel" autocomplete="tel">
+          <label for="claim-note">補充說明 <span class="muted">選填</span></label><textarea id="claim-note"></textarea>
+          <div class="row" style="margin-top:18px"><button class="btn" type="submit" id="claim-submit">送出認領申請</button></div>
+        </form>
+        <h3 style="margin-top:24px">我的認領申請</h3>
+        <ul class="list" id="my-claims"></ul>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/assets/js/account.js"></script>
+</body>
+</html>

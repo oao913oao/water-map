@@ -1,0 +1,18 @@
+# 每日排程：把逾期的合格店家降回「未查核」，同時讓 Supabase 免費專案保持活躍、不被暫停
+name: daily-maintenance
+on:
+  schedule:
+    - cron: '7 17 * * *'   # 台灣時間每天 01:07
+  workflow_dispatch:
+jobs:
+  expire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 呼叫 expire_stale
+        run: |
+          URL=$(grep -oP "SUPABASE_URL = '\K[^']+" assets/js/config.js)
+          KEY=$(grep -oP "SUPABASE_ANON_KEY = '\K[^']+" assets/js/config.js)
+          if [ -z "$URL" ]; then echo "尚未設定 Supabase，略過"; exit 0; fi
+          curl -fsS -X POST "$URL/rest/v1/rpc/expire_stale" \
+            -H "apikey: $KEY" -H "Content-Type: application/json" -d "{}"
