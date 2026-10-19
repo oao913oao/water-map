@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>管理後台｜合格用水場所地圖</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>💧 管理後台</h1>
+  <nav><a href="index.html">回地圖</a><a href="#" id="logout" hidden>登出</a></nav>
+</header>
+<main class="page">
+  <section id="login" class="card" hidden>
+    <h2>管理員登入</h2>
+    <p class="muted">輸入 Email，系統會寄登入連結給你。</p>
+    <form id="lf" class="row"><input type="email" name="email" required style="flex:1"><button class="btn">寄送登入連結</button></form>
+    <div id="lout"></div>
+  </section>
+
+  <section id="noadmin" class="card" hidden>
+    <h2>尚未取得管理權限</h2>
+    <p>你的使用者 ID：<code id="uid"></code></p>
+    <p class="muted">請把這個 ID 加入 Supabase 的 <code>admins</code> 資料表後重新整理。</p>
+  </section>
+
+  <div id="app" hidden>
+    <section class="card">
+      <h2>待審核的店家上傳 <span class="muted" id="subcount"></span></h2>
+      <div id="subs"></div>
+    </section>
+
+    <section class="card">
+      <h2 id="formtitle">新增店家</h2>
+      <form id="sf">
+        <input type="hidden" name="id">
+        <label>店名 *</label><input type="text" name="name" required>
+        <label>地址</label>
+        <div class="row"><input type="text" name="address" style="flex:1"><button type="button" class="btn ghost" id="geo">地址定位</button></div>
+        <label>縣市</label><input type="text" name="city" placeholder="例：台北市">
+        <label>位置 *（點地圖或拖曳標記）</label>
+        <div id="mini" class="mini-map"></div>
+        <p class="muted" id="ll">尚未設定位置</p>
+        <label>查核狀態</label>
+        <select name="status"><option value="pending">尚未查核</option><option value="passed">查核合格</option><option value="failed">查核不合格</option></select>
+        <label>查核日期</label><input type="date" name="inspected_at">
+        <label>淨水設備品牌／型號</label><input type="text" name="filter_brand">
+        <label>最近更換濾心日期</label><input type="date" name="cartridge_changed_at">
+        <label>查核備註（公開顯示）</label><textarea name="inspection_note" rows="2"></textarea>
+        <input type="hidden" name="photo_paths">
+        <div class="photos" id="formphotos"></div>
+        <div id="sout"></div>
+        <p class="row"><button class="btn">儲存</button><button type="button" class="btn ghost" id="reset">清空表單</button></p>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>所有店家 <span class="muted" id="storecount"></span></h2>
+      <input type="search" id="q" placeholder="搜尋">
+      <ul class="list" id="stores"></ul>
+    </section>
+  </div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const sf = $("sf");
+let stores = [], subs = [], pos = null, marker = null, mini = null, fromSubmission = null;
+
+function msg(el, t, m) { $(el).innerHTML = `<div class="msg ${t}">${esc(m)}</div>`; }
+
+$("lf").onsubmit = async (e) => {
+  e.preventDefault();
+  const { error } = await sb.auth.signInWithOtp({
+    email: e.target.email.value,
+    options: { emailRedirectTo: location.href.split("#")[0] },
+  });
+  error ? msg("lout", "err", error.message) : msg("lout", "ok", "已寄出，請到信箱點登入連結。");
+};
+$("logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { $("login").hidden = false; return; }
+  $("logout").hidden = false;
+  const { data: isAdmin } = await sb.rpc("is_admin");
+  if (!isAdmin) { $("noadmin").hidden = false; $("uid").textContent = session.user.id; return; }
+  $("app").hidden = false;
+  initMap();
+  await Promise.all([loadSubs(), loadStores()]);
+}
+sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" && $("app").hidden && $("noadmin").hidden) location.reload(); });
+
+function initMap() {
+  mini = L.map("mini").setView(APP_CONFIG.MAP_CENTER, 7);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap" }).addTo(mini);
+  mini.on("click", (e) => setPos(e.latlng));
+}
+function setPos(p, zoom = true) {
+  pos = p ? { lat: +p.lat, lng: +p.lng } : null;
+  if (!pos) { if (marker) { mini.removeLayer(marker); marker = null; } $("ll").textContent = "尚未設定位置"; return; }
+  marker ? marker.setLatLng(pos) : (marker = L.marker(pos, { draggable: true }).addTo(mini).on("dragend", (e) => setPos(e.target.getLatLng(), false)));
+  if (zoom) mini.setView(pos, 17);
+  $("ll").textContent = `緯度 ${pos.lat.toFixed(6)}，經度 ${pos.lng.toFixed(6)}`;
+}
+$("geo").onclick = async () => {
+  const g = await geocode(sf.address.value);
+  g ? setPos(g) : msg("sout", "err", "找不到地址，請點地圖。");
+};
+
+function fillForm(s = {}) {
+  sf.reset();
+  for (const k of ["id", "name", "address", "city", "status", "inspected_at", "filter_brand", "cartridge_changed_at", "inspection_note"])
+    if (s[k] != null) sf[k].value = s[k];
+  sf.photo_paths.value = JSON.stringify(s.photo_paths || []);
+  $("formphotos").innerHTML = (s.photo_paths || []).map((p) => `<img src="${photoUrl(p)}" alt="">`).join("");
+  $("formtitle").textContent = s.id ? "編輯店家" : "新增店家";
+  setPos(s.lat != null ? { lat: s.lat, lng: s.lng } : null);
+  $("sout").innerHTML = "";
+  sf.scrollIntoView({ behavior: "smooth" });
+}
+$("reset").onclick = () => { fromSubmission = null; fillForm(); };
+
+sf.onsubmit = async (e) => {
+  e.preventDefault();
+  if (!pos) return msg("sout", "err", "請先在地圖上設定位置。");
+  const d = Object.fromEntries(new FormData(sf));
+  const row = {
+    name: d.name, address: d.address || null, city: d.city || null, lat: pos.lat, lng: pos.lng,
+    status: d.status, inspected_at: d.inspected_at || null, filter_brand: d.filter_brand || null,
+    cartridge_changed_at: d.cartridge_changed_at || null, inspection_note: d.inspection_note || null,
+    photo_paths: JSON.parse(d.photo_paths || "[]"),
+  };
+  const q = d.id ? sb.from("stores").update(row).eq("id", d.id).select().single()
+                 : sb.from("stores").insert(row).select().single();
+  const { data, error } = await q;
+  if (error) return msg("sout", "err", error.message);
+  if (fromSubmission) {
+    await sb.from("submissions").update({ review_status: "approved", store_id: data.id }).eq("id", fromSubmission);
+    fromSubmission = null; await loadSubs();
+  }
+  msg("sout", "ok", "已儲存。");
+  sf.id.value = data.id;
+  await loadStores();
+};
+
+async function loadSubs() {
+  const { data, error } = await sb.from("submissions").select("*").eq("review_status", "submitted").order("created_at");
+  if (error) return ($("subs").textContent = error.message);
+  subs = data;
+  $("subcount").textContent = `(${subs.length})`;
+  $("subs").innerHTML = subs.length ? subs.map((s) => `
+    <div class="card" data-id="${s.id}">
+      <b>${esc(s.store_name)}</b> <span class="muted">${new Date(s.created_at).toLocaleString("zh-TW")}</span>
+      <div class="muted">${esc(s.address)}</div>
+      ${s.filter_brand ? `<div>設備：${esc(s.filter_brand)}</div>` : ""}
+      ${s.cartridge_changed_at ? `<div>更換濾心：${esc(s.cartridge_changed_at)}</div>` : ""}
+      ${s.contact ? `<div>聯絡：${esc(s.contact)}</div>` : ""}
+      ${s.message ? `<div>說明：${esc(s.message)}</div>` : ""}
+      <div class="photos">${s.photo_paths.map((p) => `<a href="${photoUrl(p)}" target="_blank" rel="noopener"><img src="${photoUrl(p)}" alt=""></a>`).join("")}</div>
+      <p class="row"><button class="btn" data-act="use">帶入表單審核</button><button class="btn danger" data-act="reject">退件</button></p>
+    </div>`).join("") : `<p class="muted">目前沒有待審核的上傳。</p>`;
+}
+$("subs").onclick = async (e) => {
+  const act = e.target.dataset.act; if (!act) return;
+  const s = subs.find((x) => x.id === e.target.closest("[data-id]").dataset.id);
+  if (act === "reject") {
+    const note = prompt("退件原因（選填）") ?? null;
+    await sb.from("submissions").update({ review_status: "rejected", review_note: note }).eq("id", s.id);
+    return loadSubs();
+  }
+  const existing = s.store_id ? stores.find((x) => x.id === s.store_id)
+    : stores.find((x) => x.name === s.store_name && (x.address || "") === (s.address || ""));
+  fromSubmission = s.id;
+  fillForm({
+    ...(existing || { status: "pending" }),
+    name: existing?.name || s.store_name, address: existing?.address || s.address,
+    lat: s.lat ?? existing?.lat, lng: s.lng ?? existing?.lng,
+    filter_brand: s.filter_brand || existing?.filter_brand,
+    cartridge_changed_at: s.cartridge_changed_at || existing?.cartridge_changed_at,
+    photo_paths: [...new Set([...(existing?.photo_paths || []), ...s.photo_paths])],
+  });
+  msg("sout", "ok", "已帶入上傳資料，確認查核狀態後按「儲存」即完成審核。");
+};
+
+async function loadStores() {
+  const { data } = await sb.from("stores").select("*").order("updated_at", { ascending: false });
+  stores = data || [];
+  renderStores();
+}
+function renderStores() {
+  const q = $("q").value.trim().toLowerCase();
+  const rows = stores.filter((s) => !q || [s.name, s.address, s.city].join(" ").toLowerCase().includes(q));
+  $("storecount").textContent = `(${stores.length})`;
+  $("stores").innerHTML = rows.map((s) => `<li data-id="${s.id}">
+    <span class="dot" style="background:${STATUS[s.status].color}"></span> <b>${esc(s.name)}</b> <span class="muted">${STATUS[s.status].label}</span>
+    <div class="muted">${esc(s.address)}</div>
+    <p class="row"><button class="btn ghost" data-act="edit">編輯</button><button class="btn danger" data-act="del">刪除</button></p></li>`).join("");
+}
+$("q").oninput = renderStores;
+$("stores").onclick = async (e) => {
+  const act = e.target.dataset.act; if (!act) return;
+  const s = stores.find((x) => x.id === e.target.closest("li").dataset.id);
+  if (act === "edit") { fromSubmission = null; return fillForm(s); }
+  if (confirm(`確定刪除「${s.name}」？`)) { await sb.from("stores").delete().eq("id", s.id); loadStores(); }
+};
+
+boot();
+</script>
+</body>
+</html>
